@@ -1,0 +1,8 @@
+Hi
+I am Test Data
+I have been created with love by swarvanusg
+I motto is to test goshnix
+Goshnix allow to use many golang api over ssh
+If the shhclient_test.go cam read me, its means it works
+Thats enough of my chit chat... Its time to get back to work
+Bye bye
