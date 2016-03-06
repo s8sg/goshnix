@@ -2,7 +2,7 @@
 
 ![](https://github.com/swarvanusg/goshnix/blob/master/doc/goshnix%20(1).png)
 
-A powerful UNIX utility for performing Golang API over SSH
+A powerful UNIX utility for performing Golang API over SSH. It abstracts the underlying method for goshnix supported api, so that your program logic stays same
 
 [![GoDoc](https://img.shields.io/badge/api-Godoc-blue.svg?style=flat-square)](https://godoc.org/github.com/swarvanusg/goshnix)
 
@@ -39,9 +39,10 @@ Get the list of dir entries
 var fileinfos []os.FileInfo
 fileinfos, _ := goshclient.ReadDir("<dirpath>")
 ```
+For full listing of supported API see the godoc.
 
 ##### Use Goshnix API to Understand Error
-Goshnix returned error could be communication error as well as cmd execution error. Goshnix provides api to understand proper error subtype 
+Goshnix returned error could be communication error as well as command execution error. Goshnix provides api to understand proper error subtype 
 ```go
 filecontent, err := goshclient.ReadFile(filename string)
 if err != nil {
@@ -56,7 +57,7 @@ if err != nil {
 ```
 
 ### How it works
-For each of the API, one or multiple unix cmds gets executed over ssh to the targeted host.
+For each of the API, one or multiple unix commands gets executed over ssh to the targeted host.
 
 ### Lisence
 MIT
