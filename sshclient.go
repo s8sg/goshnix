@@ -11,8 +11,37 @@ type ssh_client struct {
 	addr   string
 }
 
+type connerror struct {
+	errorstr string
+}
+
+func (e connerror) Error() string {
+	return fmt.Sprintf("%v", e.errorstr)
+}
+
+func throw_connerror(err string, data ...interface{}) connerror {
+	errstr := fmt.Sprintf(err, data...)
+	con_err := connerror{errstr}
+	return con_err
+}
+
+type Cmderror struct {
+	Command    string
+	Errorstr   string
+	Returncode int
+}
+
+func (e Cmderror) Error() string {
+	return fmt.Sprintf("command: %s, returncode: %d, error: %s", e.Command, e.Returncode, e.Errorstr)
+}
+
+func throw_cmderror(command, err string, retcode int) Cmderror {
+	cmderror := Cmderror{command, err, retcode}
+	return cmderror
+}
+
 // Create a ssh client for a specific host
-func create_ssh_client(host, port, uname, pass string) (*ssh_client, error) {
+func create_sshclient(host, port, uname, pass string) (*ssh_client, error) {
 	sshConfig := &ssh.ClientConfig{
 		User: uname,
 		Auth: []ssh.AuthMethod{
@@ -45,13 +74,11 @@ func parse_response(output string) (string, int) {
 func (client *ssh_client) execute_command(command string) (string, error) {
 	connection, err := ssh.Dial("tcp", client.addr, client.config)
 	if err != nil {
-		//fmt.Printf("Failed to dial: %s", err)
-		return "", fmt.Errorf("Failed to dial: %s", err)
+		return "", throw_connerror("Failed to dial: %s", err)
 	}
 	session, err := connection.NewSession()
 	if err != nil {
-		//fmt.Printf("Failed to initiate session: %s", err)
-		return "", fmt.Errorf("Failed to initiate session: %s", err)
+		return "", throw_connerror("Failed to initiate session: %s", err)
 	}
 	defer session.Close()
 	var stdoutBuf bytes.Buffer
@@ -61,8 +88,7 @@ func (client *ssh_client) execute_command(command string) (string, error) {
 	ncommand := fmt.Sprintf("%s;%s", command, "echo $?")
 	err = session.Run(ncommand)
 	if err != nil {
-		//fmt.Printf("Unable to run command: %v", err)
-		return "", fmt.Errorf("Unable to run command: %v", err)
+		return "", throw_connerror("Unable to run command: %v", err)
 	}
 	var reterr error = nil
 	errstr := stderrBuf.String()
@@ -72,7 +98,7 @@ func (client *ssh_client) execute_command(command string) (string, error) {
 		op = errstr
 	}
 	if returncode != 0 {
-		reterr = fmt.Errorf("%s", errstr)
+		reterr = throw_cmderror(command, errstr, returncode)
 	}
 	return op, reterr
 }

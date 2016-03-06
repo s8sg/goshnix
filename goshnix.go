@@ -3,7 +3,10 @@ package goshnix
 import "fmt"
 import "strings"
 import "os"
+import "time"
+import "strconv"
 
+// The Goshnix lib client
 type Goshnix struct {
 	client *ssh_client
 }
@@ -18,21 +21,33 @@ type fileinfo struct {
 
 //Initialize the goshnix client
 func Init(host, port, uname, pass string) (*Goshnix, error) {
-	client, err := create_ssh_client(host, port, uname, pass)
+	client, err := create_sshclient(host, port, uname, pass)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create ssh client: %v", err)
+		return nil, err
 	}
 	op, excerr := client.execute_command("echo \"Hello\"")
 	if excerr != nil {
-		return nil, fmt.Errorf("Test Command execution failed: %v", excerr)
+		return nil, excerr
 	}
 	if op != "Hello" {
-		return nil, fmt.Errorf("Test command execution invalid output")
+		return nil, throw_connerror("Test command execution invalid output")
 	}
 	goshnix := &Goshnix{}
 	goshnix.client = client
 
 	return goshnix, nil
+}
+
+//Isssherror check if error is due to any ssh connection error
+func Isssherror(err error) bool {
+	_, ok := err.(connerror)
+	return ok
+}
+
+// Iscmderror check if error is due to command execution failed
+func Iscmderror(err error) bool {
+	_, ok := err.(Cmderror)
+	return ok
 }
 
 //Chmod changes the mode of the named file to mode. If the file is a symbolic link, it changes the mode of the link's target
@@ -48,43 +63,53 @@ func (goshnix *Goshnix) Chmod(name string, mode os.FileMode) error {
 
 //Chown changes the numeric uid and gid of the named file. If the file is a symbolic link, it changes the uid and gid of the link's target
 func (goshnix *Goshnix) Chown(name string, uid, gid int) error {
-
+	command := fmt.Sprintf("chown %d:%d %s", uid, gid, name)
+	_, err := goshnix.client.execute_command(command)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 //Environ returns a copy of strings representing the environment, in the form "key=value"
-func (goshnix *Goshnix) Environ() []string {
+func (goshnix *Goshnix) Environ() ([]string, error) {
 	command := "env"
 	op, err := goshnix.client.execute_command(command)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	envs := strings.Split(op, "\n")
-	return envs
+	return envs, nil
 }
 
 //Getenv retrieves the value of the environment variable named by the key. It returns the value, which will be empty if the variable is not present
-func (goshnix *Goshnix) Getenv(key string) string {
-	envs = goshnix.Environ()
+func (goshnix *Goshnix) Getenv(key string) (string, error) {
+	envs, err := goshnix.Environ()
+	if err != nil {
+		return "", err
+	}
 	for _, env := range envs {
 		keyval := strings.Split(env, "=")
 		if keyval[0] == key {
-			return keyval[1]
+			return keyval[1], nil
 		}
 	}
-	return ""
+	return "", nil
 }
 
 //LookupEnv retrieves the value of the environment variable named by the key. If the variable is present in the environment the value (which may be empty) is returned and the boolean is true
-func (goshnix *Goshnix) LookupEnv(key string) (string, bool) {
-	envs = goshnix.Environ()
+func (goshnix *Goshnix) LookupEnv(key string) (string, bool, error) {
+	envs, err := goshnix.Environ()
+	if err != nil {
+		return "", false, err
+	}
 	for _, env := range envs {
 		keyval := strings.Split(env, "=")
 		if keyval[0] == key {
-			return keyval[1], true
+			return keyval[1], true, nil
 		}
 	}
-	return "", false
+	return "", false, nil
 }
 
 //Hostname returns the host name reported by the kernel
@@ -109,7 +134,7 @@ func (goshnix *Goshnix) Link(oldname, newname string) error {
 
 // Mkdir creates a new directory with the specified name and permission bits
 func (goshnix *Goshnix) Mkdir(name string, perm os.FileMode) error {
-	mode := int(prem)
+	mode := int(perm)
 	command := fmt.Sprintf("mkdir %s --mode=%d", name, mode)
 	_, err := goshnix.client.execute_command(command)
 	if err != nil {
@@ -140,7 +165,7 @@ func (goshnix *Goshnix) Remove(name string) error {
 
 // RemoveAll removes path and any children it contains. It removes everything it can but returns the first error it encounters
 func (goshnix *Goshnix) RemoveAll(path string) error {
-	command := fmt.Sprintf("rm -rf %s", name)
+	command := fmt.Sprintf("rm -rf %s", path)
 	_, err := goshnix.client.execute_command(command)
 	if err != nil {
 		return err
@@ -150,13 +175,21 @@ func (goshnix *Goshnix) RemoveAll(path string) error {
 
 // Rename renames (moves) oldpath to newpath. If newpath already exists, Rename replaces it. OS-specific restrictions may apply when oldpath and newpath are in different directories
 func (goshnix *Goshnix) Rename(oldpath, newpath string) error {
-
+	command := fmt.Sprintf("mv %s %s", oldpath, newpath)
+	_, err := goshnix.client.execute_command(command)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // Symlink creates newname as a symbolic link to oldname
 func (goshnix *Goshnix) Symlink(oldname, newname string) error {
-
+	command := fmt.Sprintf("ln -s %s %s", oldname, newname)
+	_, err := goshnix.client.execute_command(command)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -165,7 +198,7 @@ func (goshnix *Goshnix) Setenv(key, value string) error {
 	command := fmt.Sprintf("export \"%s=%s\"", key, value)
 	_, err := goshnix.client.execute_command(command)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	return nil
 }
@@ -182,7 +215,7 @@ func (goshnix *Goshnix) Stat(name string) (os.FileInfo, error) {
 	lines := strings.Split(statop, "\n")
 	var file string
 	var isdir bool
-	var mode os.Filemode
+	var mode os.FileMode
 	var modtime time.Time
 	var size int64
 	for _, line := range lines {
@@ -192,8 +225,9 @@ func (goshnix *Goshnix) Stat(name string) (os.FileInfo, error) {
 		case "File:":
 			file = strings.Trim(trimlines[1], "'")
 		case "Size":
-			size = strcnv.Atoi(trimlines[1])
-			if trimline[7] == "directory" {
+			sizei, _ := strconv.Atoi(trimlines[1])
+			size = int64(sizei)
+			if trimlines[7] == "directory" {
 				isdir = true
 			} else {
 				isdir = false
@@ -202,17 +236,20 @@ func (goshnix *Goshnix) Stat(name string) (os.FileInfo, error) {
 			for _, key := range trimlines {
 				if key == "Uid" {
 					mdata := strings.Split(strings.Trim(trimlines[1], "()"), "/")[0]
-					mode = os.FileInfo(strcnv.Atoi(mdata))
+					modei, _ := strconv.Atoi(mdata)
+					mode = os.FileMode(modei)
 				}
 			}
 		case "Modify":
-			date = trimlines[1]
-			tym = trimlines[2]
-			// TODO: Claculate time and ser modtime
+			/*
+				date := trimlines[1]
+				tym := trimlines[2]
+			*/
+			// TODO: Claculate time and set modtime
 		}
 	}
 	finfo := &fileinfo{}
-	finfo.file = file
+	finfo.name = file
 	finfo.isdir = isdir
 	finfo.mode = mode
 	finfo.modtime = modtime
@@ -231,7 +268,7 @@ func (finfo *fileinfo) Size() int64 {
 }
 
 // Get file mode bits
-func (finfo *fileinfo) Mode() os.Filemode {
+func (finfo *fileinfo) Mode() os.FileMode {
 	return finfo.mode
 }
 
@@ -251,11 +288,39 @@ func (finfo *fileinfo) Sys() interface{} {
 }
 
 // Kill a running process by its pid
-func Kill(pid int) error {
+func (goshnix *Goshnix) Kill(pid int) error {
 	command := fmt.Sprintf("kill -9 %d", pid)
 	_, err := goshnix.client.execute_command(command)
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+// ReadDir reads the directory named by dirname and returns a list of directory entries sorted by filename
+func (goshnix *Goshnix) ReadDir(dirname string) ([]os.FileInfo, error) {
+	command := fmt.Sprintf("ls -a %s", dirname) // It should sort by default
+	op, err := goshnix.client.execute_command(command)
+	if err != nil {
+		return nil, err
+	}
+	files := strings.Split(op, "\n")
+	var fileinfos []os.FileInfo
+	for _, file := range files {
+		fileinfo, err := goshnix.Stat(file)
+		if err != nil {
+			return fileinfos, err
+		}
+		fileinfos = append(fileinfos, fileinfo)
+	}
+	return fileinfos, nil
+}
+
+// ReadFile reads the file named by filename and returns the contents. A successful call returns err == nil, not err == EOF. Because ReadFile reads the whole file, it does not treat an EOF from Read as an error to be reported.
+func (goshnix *Goshnix) ReadFile(filename string) ([]byte, error) {
+	op, err := goshnix.client.get_file_content(filename)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(op), nil
 }

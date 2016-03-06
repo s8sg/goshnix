@@ -17,7 +17,7 @@ var (
 )
 
 func TestSshClientCreation(t *testing.T) {
-	client, err := create_ssh_client(host, port, uname, pass)
+	client, err := create_sshclient(host, port, uname, pass)
 	if err != nil || client == nil {
 		t.Errorf("Failed to create ssh client: %s", err)
 	}
@@ -25,7 +25,7 @@ func TestSshClientCreation(t *testing.T) {
 }
 
 func TestExecuteCommand(t *testing.T) {
-	client, err := create_ssh_client(host, port, uname, pass)
+	client, err := create_sshclient(host, port, uname, pass)
 	if err != nil || client == nil {
 		t.Errorf("Failed to create ssh client: %s", err)
 	}
@@ -46,7 +46,7 @@ func TestExecuteCommand(t *testing.T) {
 }
 
 func TestGetFileContent(t *testing.T) {
-	client, err := create_ssh_client(host, port, uname, pass)
+	client, err := create_sshclient(host, port, uname, pass)
 	if err != nil || client == nil {
 		t.Errorf("Failed to create ssh client: %s", err)
 	}
